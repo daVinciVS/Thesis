@@ -1,0 +1,6 @@
+event_id,direction,raw_frame_index,clip_frame_index,timestamp_seconds,manual_vehicle_id,pipeline_track_id,is_violation,verification_status,notes
+1,far_side,44502,252,1513.56,TBD,7,TBD,pending,Verify whether vehicle crossed into R_violation during red
+2,near_side,44648,398,1518.52,TBD,9,TBD,pending,Verify whether vehicle crossed into R_violation during red
+3,near_side,44672,422,1519.34,TBD,13,TBD,pending,Verify whether vehicle crossed into R_violation during red
+4,near_side,44718,468,1520.90,TBD,12,TBD,pending,Verify whether vehicle crossed into R_violation during red
+5,near_side,44783,533,1523.11,TBD,19,TBD,pending,Verify whether vehicle crossed into R_violation during red
