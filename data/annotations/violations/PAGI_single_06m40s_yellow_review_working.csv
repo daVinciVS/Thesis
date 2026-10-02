@@ -1,0 +1,2 @@
+candidate_id,video_name,direction,raw_frame_index,clip_frame_index,timestamp_seconds,pipeline_track_id,confidence,traffic_light_state,was_armed,was_reported,anchor_name,anchor_x,anchor_y,bbox_x1,bbox_y1,bbox_x2,bbox_y2,manual_vehicle_id,object_is_car,entered_rv_after_red,is_violation,review_status,notes
+1,PAGI.mp4,far_side,11890,190,404.391,1,0.7125,green,False,False,bottom_right,677.46,576.87,572.81,493.9,677.46,576.87,C01,true,false,false,reviewed,Car entered R_violation during flashing yellow; lamp was temporarily off and system predicted green; not a red-light violation

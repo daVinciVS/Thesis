@@ -1,0 +1,2 @@
+event_id,video_name,manual_vehicle_id,direction,raw_frame_index,clip_frame_index,timestamp_seconds,ground_truth_light_state,is_violation,pipeline_flagged,pipeline_track_id,review_candidate_ids,notes
+1,PAGI.mp4,C01,far_side,11890,190,404.391,yellow,false,false,1,1,Car entered R_violation during flashing yellow; lamp temporarily off between flashes; system predicted green; non-violation

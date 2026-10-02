@@ -1,0 +1,2 @@
+clip_start_frame,clip_end_frame,raw_start_frame,raw_end_frame,ground_truth_state,is_ambiguous,notes
+0,599,11700,12299,yellow,false,Flashing yellow phase; lamp may be visually off between flashes; annotated as yellow for this study
