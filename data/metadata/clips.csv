@@ -1,2 +1,2 @@
 clip_id,source_video,start_frame,end_frame,frames,fps,duration_seconds,scenario,traffic_density,contains_red,contains_yellow,contains_green,manual_violation_count,pipeline_violation_count,notes
-PAGI_25m07s_red_phase,PAGI.mp4,44250,45249,1000,29.4023,34.010,multi_object,high,true,false,false,TBD,5,Known red-phase clip beginning around 25:05.24; manually verify five pipeline events before finalizing ground truth
+PAGI_25m07s_red_phase,PAGI.mp4,44250,45249,1000,29.4023,34.010,multi_object,high,true,true,true,5,5,20 crossing candidates reviewed; 5 manually confirmed red-light violations; temporary false-green estimates observed before two delayed reports

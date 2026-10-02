@@ -1,0 +1,5 @@
+clip_start_frame,clip_end_frame,raw_start_frame,raw_end_frame,ground_truth_state,is_ambiguous,notes
+0,20,44250,44270,yellow,false,Yellow lamp visibly active; HSV estimator may intermittently predict green
+21,578,44271,44828,red,false,Red lamp visibly active
+579,668,44829,44918,green,false,Green lamp visibly active
+669,999,44919,45249,yellow,false,Yellow lamp visibly active; HSV estimator may intermittently predict green
