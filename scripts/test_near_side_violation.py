@@ -1,0 +1,629 @@
+from __future__ import annotations
+
+import argparse
+import csv
+import sys
+from dataclasses import asdict
+from pathlib import Path
+
+import cv2
+import numpy as np
+import yaml
+from ultralytics import YOLO
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+from rlvd.geometry import (
+    bbox_bottom_center,
+    point_inside_polygon,
+    polygon_from_points,
+)
+from rlvd.traffic_light import TrafficLightEstimator
+from rlvd.violation import NearSideViolationManager
+
+
+WINDOW_NAME = "Near-Side Red-Light Violation Test"
+
+
+def draw_transparent_polygon(
+    frame: np.ndarray,
+    polygon: np.ndarray,
+    label: str,
+    color: tuple[int, int, int],
+    alpha: float,
+) -> None:
+    overlay = frame.copy()
+
+    cv2.fillPoly(overlay, [polygon], color)
+    cv2.addWeighted(overlay, alpha, frame, 1.0 - alpha, 0, frame)
+
+    cv2.polylines(
+        frame,
+        [polygon],
+        isClosed=True,
+        color=color,
+        thickness=3,
+        lineType=cv2.LINE_AA,
+    )
+
+    x, y = polygon[0][0]
+
+    cv2.putText(
+        frame,
+        label,
+        (int(x), max(28, int(y) - 10)),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.64,
+        color,
+        2,
+        cv2.LINE_AA,
+    )
+
+
+def draw_traffic_light_rois(
+    frame: np.ndarray,
+    rectangles: list[list[int]],
+    signal_state: str,
+) -> None:
+    colors = {
+        "red": (0, 0, 255),
+        "yellow": (0, 255, 255),
+        "green": (0, 255, 0),
+        "unknown": (150, 150, 150),
+    }
+
+    color = colors.get(signal_state, (150, 150, 150))
+
+    for index, rect in enumerate(rectangles, start=1):
+        x1, y1, x2, y2 = [int(value) for value in rect]
+
+        cv2.rectangle(
+            frame,
+            (x1, y1),
+            (x2, y2),
+            color,
+            thickness=3,
+            lineType=cv2.LINE_AA,
+        )
+
+        cv2.putText(
+            frame,
+            f"TL {index}: {signal_state.upper()}",
+            (x1, max(28, y1 - 10)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.60,
+            color,
+            2,
+            cv2.LINE_AA,
+        )
+
+
+def draw_track(
+    frame: np.ndarray,
+    bbox_xyxy: tuple[float, float, float, float],
+    track_id: int,
+    confidence: float,
+    event_detected: bool,
+) -> None:
+    x1, y1, x2, y2 = [int(round(value)) for value in bbox_xyxy]
+
+    color = (0, 0, 255) if event_detected else (255, 180, 0)
+
+    label = f"ID {track_id} | car {confidence:.2f}"
+
+    cv2.rectangle(
+        frame,
+        (x1, y1),
+        (x2, y2),
+        color,
+        thickness=3 if event_detected else 2,
+        lineType=cv2.LINE_AA,
+    )
+
+    cv2.putText(
+        frame,
+        label,
+        (x1, max(25, y1 - 8)),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.56,
+        color,
+        2,
+        cv2.LINE_AA,
+    )
+
+    if event_detected:
+        cv2.putText(
+            frame,
+            "RED-LIGHT VIOLATION",
+            (x1, min(frame.shape[0] - 18, y2 + 26)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.64,
+            (0, 0, 255),
+            2,
+            cv2.LINE_AA,
+        )
+
+
+def draw_status_panel(
+    frame: np.ndarray,
+    frame_index: int,
+    fps: float,
+    raw_state: str,
+    smoothed_state: str,
+    red_pixels: int,
+    yellow_pixels: int,
+    green_pixels: int,
+    near_tracks: int,
+    violations: int,
+) -> None:
+    colors = {
+        "red": (0, 0, 255),
+        "yellow": (0, 255, 255),
+        "green": (0, 255, 0),
+        "unknown": (180, 180, 180),
+    }
+
+    lines = [
+        f"Frame: {frame_index}",
+        f"Time: {frame_index / fps:.2f} sec",
+        f"TL raw: {raw_state.upper()}",
+        f"TL smooth: {smoothed_state.upper()}",
+        f"HSV pixels R:{red_pixels}  Y:{yellow_pixels}  G:{green_pixels}",
+        f"Near-side tracks: {near_tracks}",
+        f"Recorded violations: {violations}",
+        "Controls: SPACE pause/resume | Q or ESC quit",
+    ]
+
+    overlay = frame.copy()
+
+    panel_x1, panel_y1 = 15, 15
+    panel_x2, panel_y2 = 690, 15 + 38 + len(lines) * 31
+
+    cv2.rectangle(
+        overlay,
+        (panel_x1, panel_y1),
+        (panel_x2, panel_y2),
+        (0, 0, 0),
+        thickness=-1,
+    )
+
+    cv2.addWeighted(overlay, 0.66, frame, 0.34, 0, frame)
+
+    for index, line in enumerate(lines):
+        color = (
+            colors.get(smoothed_state, (255, 255, 255))
+            if index == 3
+            else (255, 255, 255)
+        )
+
+        cv2.putText(
+            frame,
+            line,
+            (panel_x1 + 15, panel_y1 + 35 + index * 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.64,
+            color,
+            2,
+            cv2.LINE_AA,
+        )
+
+
+def write_violation_csv(
+    output_path: Path,
+    events: list,
+) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not events:
+        fieldnames = [
+            "video_name",
+            "frame_index",
+            "timestamp_seconds",
+            "red_phase_id",
+            "track_id",
+            "bbox_x1",
+            "bbox_y1",
+            "bbox_x2",
+            "bbox_y2",
+            "stop_iou",
+            "traffic_light_state",
+            "evidence_frame_path",
+            "evidence_crop_path",
+        ]
+
+        with output_path.open("w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+
+        return
+
+    with output_path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(
+            file,
+            fieldnames=list(asdict(events[0]).keys()),
+        )
+
+        writer.writeheader()
+
+        for event in events:
+            writer.writerow(asdict(event))
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Integrated near-side YOLOv8 + ByteTrack + HSV "
+            "red-light violation test."
+        )
+    )
+
+    parser.add_argument(
+        "--video",
+        required=True,
+        help="Path to input video.",
+    )
+
+    parser.add_argument(
+        "--config",
+        default="configs/pipeline.yaml",
+        help="Path to pipeline YAML configuration.",
+    )
+
+    parser.add_argument(
+        "--start-frame",
+        type=int,
+        default=35000,
+        help="First input frame to process.",
+    )
+
+    parser.add_argument(
+        "--frames",
+        type=int,
+        default=300,
+        help="Number of frames to process.",
+    )
+
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+
+    video_path = Path(args.video)
+    config_path = Path(args.config)
+
+    if not video_path.exists():
+        raise FileNotFoundError(f"Video does not exist: {video_path}")
+
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config does not exist: {config_path}")
+
+    with config_path.open("r", encoding="utf-8") as file:
+        config = yaml.safe_load(file)
+
+    model_config = config["model"]
+    roi_config = config["roi"]
+    traffic_light_config = config["traffic_light"]
+    violation_config = config["violation"]
+
+    near_vehicle_polygon = polygon_from_points(
+        roi_config["vehicle_regions"]["near_side"]["polygon"]
+    )
+
+    far_vehicle_polygon = polygon_from_points(
+        roi_config["vehicle_regions"]["far_side"]["polygon"]
+    )
+
+    near_stop_polygon = polygon_from_points(
+        roi_config["stop_lines"]["near_side"]["polygon"]
+    )
+
+    far_stop_polygon = polygon_from_points(
+        roi_config["stop_lines"]["far_side"]["polygon"]
+    )
+
+    violation_polygon = polygon_from_points(
+        roi_config["violation_region"]["polygon"]
+    )
+
+    near_traffic_light_rois = roi_config["traffic_light_rois"]["common"]
+
+    weights_path = PROJECT_ROOT / model_config["weights"]
+    tracker_path = PROJECT_ROOT / model_config["tracker_config"]
+
+    if not tracker_path.exists():
+        raise FileNotFoundError(
+            f"ByteTrack configuration does not exist: {tracker_path}"
+        )
+
+    print(f"Loading model: {weights_path}")
+    print(f"Using tracker: {tracker_path}")
+
+    model = YOLO(str(weights_path))
+
+    traffic_light_estimator = TrafficLightEstimator(
+        hsv_thresholds=traffic_light_config["hsv_thresholds"],
+        smoothing_window=int(traffic_light_config["smoothing_window"]),
+        morphology_kernel_size=int(
+            traffic_light_config["morphology_kernel_size"]
+        ),
+        min_active_pixels=int(traffic_light_config["min_active_pixels"]),
+    )
+
+    evidence_dir = (
+        PROJECT_ROOT
+        / config["project"]["output_root"]
+        / "evidence"
+        / f"{video_path.stem}_near_side"
+    )
+
+    violation_manager = NearSideViolationManager(
+        near_vehicle_polygon=near_vehicle_polygon,
+        near_stop_polygon=near_stop_polygon,
+        violation_polygon=violation_polygon,
+        min_stop_iou=float(violation_config["min_stop_iou"]),
+        min_directional_displacement_px=float(
+            violation_config["min_directional_displacement_px"]
+        ),
+        crossing_window_frames=int(
+            violation_config["crossing_window_frames"]
+        ),
+        reset_track_state_after_missing_frames=int(
+            violation_config["reset_track_state_after_missing_frames"]
+        ),
+        save_evidence=bool(violation_config["save_evidence"]),
+        evidence_dir=evidence_dir,
+        evidence_padding=int(violation_config["evidence_padding"]),
+    )
+
+    capture = cv2.VideoCapture(str(video_path))
+
+    if not capture.isOpened():
+        raise RuntimeError(f"Could not open video: {video_path}")
+
+    fps = float(capture.get(cv2.CAP_PROP_FPS))
+    capture.set(cv2.CAP_PROP_POS_FRAMES, args.start_frame)
+
+    cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(WINDOW_NAME, 1500, 850)
+
+    processed = 0
+    paused = False
+    latest_frame = None
+
+    print("Near-side violation test started.")
+    print("SPACE = pause/resume | Q or ESC = quit")
+
+    try:
+        while processed < args.frames:
+            if not paused:
+                success, frame = capture.read()
+
+                if not success:
+                    print("Reached end of video.")
+                    break
+
+                frame_index = args.start_frame + processed
+
+                traffic_light_estimate = traffic_light_estimator.update(
+                    frame_bgr=frame,
+                    roi_rectangles=near_traffic_light_rois,
+                )
+
+                result = model.track(
+                    source=frame,
+                    persist=True,
+                    tracker=str(tracker_path),
+                    classes=[int(model_config["car_class_id"])],
+                    conf=float(model_config["confidence"]),
+                    iou=float(model_config["iou"]),
+                    imgsz=int(model_config["imgsz"]),
+                    device=model_config["device"],
+                    verbose=False,
+                )[0]
+
+                annotated = frame.copy()
+
+                draw_transparent_polygon(
+                    annotated,
+                    near_vehicle_polygon,
+                    "ROI_vehicle_near",
+                    (255, 180, 0),
+                    alpha=0.10,
+                )
+
+                draw_transparent_polygon(
+                    annotated,
+                    far_vehicle_polygon,
+                    "ROI_vehicle_far (not evaluated)",
+                    (0, 255, 0),
+                    alpha=0.08,
+                )
+
+                draw_transparent_polygon(
+                    annotated,
+                    near_stop_polygon,
+                    "R_stop_near",
+                    (0, 0, 255),
+                    alpha=0.40,
+                )
+
+                draw_transparent_polygon(
+                    annotated,
+                    far_stop_polygon,
+                    "R_stop_far (not evaluated)",
+                    (255, 0, 255),
+                    alpha=0.35,
+                )
+
+                draw_transparent_polygon(
+                    annotated,
+                    violation_polygon,
+                    "R_violation",
+                    (0, 165, 255),
+                    alpha=0.12,
+                )
+
+                draw_traffic_light_rois(
+                    annotated,
+                    near_traffic_light_rois,
+                    traffic_light_estimate.smoothed_state,
+                )
+
+                near_tracks = 0
+
+                if (
+                    result.boxes is not None
+                    and result.boxes.id is not None
+                ):
+                    boxes = result.boxes.xyxy.cpu().numpy()
+                    confidences = result.boxes.conf.cpu().numpy()
+                    track_ids = result.boxes.id.int().cpu().tolist()
+
+                    for bbox_array, confidence, track_id in zip(
+                        boxes,
+                        confidences,
+                        track_ids,
+                    ):
+                        bbox_xyxy = tuple(
+                            float(value)
+                            for value in bbox_array.tolist()
+                        )
+
+                        bottom_center = bbox_bottom_center(bbox_xyxy)
+
+                is_in_near_roi = point_inside_polygon(
+                    bottom_center,
+                    near_vehicle_polygon,
+                )
+
+                is_in_far_roi = point_inside_polygon(
+                    bottom_center,
+                    far_vehicle_polygon,
+                )
+
+                is_existing_near_candidate = (
+                    int(track_id) in violation_manager.track_states
+                )
+
+                event = None
+
+                # Near-side decision only.
+                if is_in_near_roi or is_existing_near_candidate:
+                    if is_in_near_roi:
+                        near_tracks += 1
+
+                    event = violation_manager.update_track(
+                        frame_bgr=frame,
+                        video_name=video_path.name,
+                        video_stem=video_path.stem,
+                        frame_index=frame_index,
+                        fps=fps,
+                        track_id=int(track_id),
+                        bbox_xyxy=bbox_xyxy,
+                        traffic_light_state=(
+                            traffic_light_estimate.smoothed_state
+                        ),
+                    )
+
+                # Draw both directions. Far side is visualization only until
+                # its proper traffic-light ROI is calibrated.
+                if is_in_near_roi or is_existing_near_candidate:
+                    draw_track(
+                        annotated,
+                        bbox_xyxy,
+                        int(track_id),
+                        float(confidence),
+                        event_detected=event is not None,
+                    )
+
+                elif is_in_far_roi:
+                    x1, y1, x2, y2 = [
+                        int(round(value))
+                        for value in bbox_xyxy
+                    ]
+
+                    cv2.rectangle(
+                        annotated,
+                        (x1, y1),
+                        (x2, y2),
+                        (0, 255, 0),
+                        2,
+                        cv2.LINE_AA,
+                    )
+
+                    cv2.putText(
+                        annotated,
+                        f"ID {track_id} | car {confidence:.2f} | FAR",
+                        (x1, max(25, y1 - 8)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.56,
+                        (0, 255, 0),
+                        2,
+                        cv2.LINE_AA,
+                    )
+                
+                draw_status_panel(
+                    annotated,
+                    frame_index,
+                    fps,
+                    traffic_light_estimate.raw_state,
+                    traffic_light_estimate.smoothed_state,
+                    traffic_light_estimate.red_pixels,
+                    traffic_light_estimate.yellow_pixels,
+                    traffic_light_estimate.green_pixels,
+                    near_tracks,
+                    len(violation_manager.events),
+                )
+
+                latest_frame = annotated
+                processed += 1
+
+            if latest_frame is not None:
+                cv2.imshow(WINDOW_NAME, latest_frame)
+
+            key = cv2.waitKey(1 if not paused else 30) & 0xFF
+
+            if key == ord(" "):
+                paused = not paused
+
+            elif key == ord("q") or key == 27:
+                break
+
+    finally:
+        capture.release()
+        cv2.destroyAllWindows()
+
+    report_path = (
+        PROJECT_ROOT
+        / config["project"]["output_root"]
+        / "reports"
+        / f"{video_path.stem}_near_side_test_violations.csv"
+    )
+
+    write_violation_csv(
+        report_path,
+        violation_manager.events,
+    )
+
+    print(f"Frames processed: {processed}")
+    print(f"Violations recorded: {len(violation_manager.events)}")
+    print(f"CSV report: {report_path.resolve()}")
+
+    if violation_manager.events:
+        print("\nRecorded events:")
+
+        for event in violation_manager.events:
+            print(
+                f"  Frame {event.frame_index} | "
+                f"time={event.timestamp_seconds:.2f}s | "
+                f"track={event.track_id} | "
+                f"red_phase={event.red_phase_id} | "
+                f"stop_iou={event.stop_iou:.4f}"
+            )
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environment
+.venv/
+venv/
+
+# VS Code
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Large raw data and generated artifacts
+data/raw/*.mp4
+data/clips/*.mp4
+outputs/
+models/pretrained/*.pt
+models/custom/*.pt
+models/custom/*.onnx
+
+# Operating system files
+.DS_Store
+Thumbs.db
+desktop.ini

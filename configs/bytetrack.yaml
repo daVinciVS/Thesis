@@ -1,0 +1,18 @@
+tracker_type: bytetrack
+
+# Thesis baseline tracker thresholds.
+track_high_thresh: 0.50
+track_low_thresh: 0.10
+new_track_thresh: 0.50
+track_buffer: 30
+match_thresh: 0.80
+
+# Required by your installed Ultralytics ByteTrack implementation.
+# It fuses detection confidence with IoU/motion association.
+fuse_score: true
+
+# Fixed camera: no global-motion compensation needed.
+gmc_method: none
+
+# Baseline ByteTrack does not use ReID appearance embeddings.
+with_reid: false
