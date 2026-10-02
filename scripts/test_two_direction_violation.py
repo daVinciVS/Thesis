@@ -211,6 +211,7 @@ def draw_status_panel(
     near_tracks: int,
     far_tracks: int,
     violations: int,
+    passage_candidates: int,
 ) -> None:
     lines = [
         f"Frame: {frame_index}",
@@ -220,6 +221,7 @@ def draw_status_panel(
         f"HSV pixels R:{red_pixels}  Y:{yellow_pixels}  G:{green_pixels}",
         f"Near-side tracks: {near_tracks}",
         f"Far-side tracks: {far_tracks}",
+        f"Passage candidates: {passage_candidates}",
         f"Recorded violations: {violations}",
         "Controls: SPACE pause/resume | Q or ESC quit",
     ]
@@ -289,6 +291,45 @@ def write_events_csv(
 
         for event in events:
             writer.writerow(asdict(event))
+
+
+def write_passage_review_csv(
+    output_path: Path,
+    passage_candidates: list[dict[str, object]],
+) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    fieldnames = [
+        "candidate_id",
+        "video_name",
+        "direction",
+        "raw_frame_index",
+        "clip_frame_index",
+        "timestamp_seconds",
+        "pipeline_track_id",
+        "confidence",
+        "traffic_light_state",
+        "was_armed",
+        "was_reported",
+        "anchor_name",
+        "anchor_x",
+        "anchor_y",
+        "bbox_x1",
+        "bbox_y1",
+        "bbox_x2",
+        "bbox_y2",
+        "manual_vehicle_id",
+        "object_is_car",
+        "entered_rv_after_red",
+        "is_violation",
+        "review_status",
+        "notes",
+    ]
+
+    with output_path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(passage_candidates)
 
 
 def parse_args() -> argparse.Namespace:
@@ -370,9 +411,7 @@ def main() -> None:
         roi_config["violation_region"]["polygon"]
     )
 
-    common_traffic_light_rois = (
-        roi_config["traffic_light_rois"]["common"]
-    )
+    common_traffic_light_rois = roi_config["traffic_light_rois"]["common"]
 
     weights_path = PROJECT_ROOT / model_config["weights"]
     tracker_path = PROJECT_ROOT / model_config["tracker_config"]
@@ -427,6 +466,10 @@ def main() -> None:
         raise RuntimeError(f"Could not open video: {video_path}")
 
     fps = float(capture.get(cv2.CAP_PROP_FPS))
+
+    if fps <= 0:
+        raise RuntimeError("Could not determine video FPS.")
+
     capture.set(cv2.CAP_PROP_POS_FRAMES, args.start_frame)
 
     cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
@@ -434,7 +477,12 @@ def main() -> None:
 
     processed = 0
     paused = False
-    latest_frame = None
+    latest_frame: np.ndarray | None = None
+
+    passage_candidates: list[dict[str, object]] = []
+
+    previous_inside_by_track: dict[tuple[str, int], bool] = {}
+    was_reported_by_track: dict[tuple[str, int], bool] = {}
 
     print("Two-direction violation test started.")
     print("SPACE = pause/resume | Q or ESC = quit")
@@ -455,11 +503,11 @@ def main() -> None:
                     roi_rectangles=common_traffic_light_rois,
                 )
 
+                signal_state = traffic_light_estimate.smoothed_state
+
                 violation_manager.begin_frame(
                     frame_index=frame_index,
-                    traffic_light_state=(
-                        traffic_light_estimate.smoothed_state
-                    ),
+                    traffic_light_state=signal_state,
                 )
 
                 result = model.track(
@@ -519,7 +567,7 @@ def main() -> None:
                 draw_traffic_light_rois(
                     annotated,
                     common_traffic_light_rois,
-                    traffic_light_estimate.smoothed_state,
+                    signal_state,
                 )
 
                 near_tracks = 0
@@ -538,6 +586,8 @@ def main() -> None:
                         confidences,
                         track_ids,
                     ):
+                        track_id = int(track_id)
+
                         bbox_xyxy = tuple(
                             float(value)
                             for value in bbox_array.tolist()
@@ -550,15 +600,12 @@ def main() -> None:
                                 video_stem=video_path.stem,
                                 frame_index=frame_index,
                                 fps=fps,
-                                track_id=int(track_id),
+                                track_id=track_id,
                                 bbox_xyxy=bbox_xyxy,
-                                traffic_light_state=(
-                                    traffic_light_estimate.smoothed_state
-                                ),
+                                traffic_light_state=signal_state,
                             )
                         )
 
-                        # Ignore tracks outside both configured approaches.
                         if direction is None or anchor is None:
                             continue
 
@@ -566,6 +613,7 @@ def main() -> None:
                             near_tracks += 1
                         elif direction == "far_side":
                             far_tracks += 1
+
                         (
                             diagnostic_direction,
                             diagnostic_anchor,
@@ -573,14 +621,146 @@ def main() -> None:
                             armed,
                             reported,
                         ) = violation_manager.get_track_diagnostics(
-                            int(track_id),
+                            track_id,
                             bbox_xyxy,
                         )
+
+                        track_key = (direction, track_id)
+
+                        previous_inside = previous_inside_by_track.get(
+                            track_key,
+                            False,
+                        )
+
+                        previously_reported = was_reported_by_track.get(
+                            track_key,
+                            False,
+                        )
+
+                        crossed_into_region = (
+                            not previous_inside
+                            and inside_region
+                        )
+
+                        newly_reported = (
+                            reported
+                            and not previously_reported
+                        )
+
+                        if crossed_into_region:
+                            x1, y1, x2, y2 = bbox_xyxy
+
+                            passage_candidates.append(
+                                {
+                                    "candidate_id": (
+                                        len(passage_candidates) + 1
+                                    ),
+                                    "video_name": video_path.name,
+                                    "direction": direction,
+                                    "raw_frame_index": frame_index,
+                                    "clip_frame_index": (
+                                        frame_index - args.start_frame
+                                    ),
+                                    "timestamp_seconds": round(
+                                        frame_index / fps,
+                                        3,
+                                    ),
+                                    "pipeline_track_id": track_id,
+                                    "confidence": round(
+                                        float(confidence),
+                                        4,
+                                    ),
+                                    "traffic_light_state": signal_state,
+                                    "was_armed": armed,
+                                    "was_reported": reported,
+                                    "anchor_name": (
+                                        violation_config[
+                                            "front_anchors"
+                                        ][direction]
+                                    ),
+                                    "anchor_x": round(
+                                        float(diagnostic_anchor[0]),
+                                        2,
+                                    ),
+                                    "anchor_y": round(
+                                        float(diagnostic_anchor[1]),
+                                        2,
+                                    ),
+                                    "bbox_x1": round(float(x1), 2),
+                                    "bbox_y1": round(float(y1), 2),
+                                    "bbox_x2": round(float(x2), 2),
+                                    "bbox_y2": round(float(y2), 2),
+                                    "manual_vehicle_id": "",
+                                    "object_is_car": "",
+                                    "entered_rv_after_red": "",
+                                    "is_violation": "",
+                                    "review_status": "pending",
+                                    "notes": "",
+                                }
+                            )
+
+                        if newly_reported and not crossed_into_region:
+                            x1, y1, x2, y2 = bbox_xyxy
+
+                            passage_candidates.append(
+                                {
+                                    "candidate_id": (
+                                        len(passage_candidates) + 1
+                                    ),
+                                    "video_name": video_path.name,
+                                    "direction": direction,
+                                    "raw_frame_index": frame_index,
+                                    "clip_frame_index": (
+                                        frame_index - args.start_frame
+                                    ),
+                                    "timestamp_seconds": round(
+                                        frame_index / fps,
+                                        3,
+                                    ),
+                                    "pipeline_track_id": track_id,
+                                    "confidence": round(
+                                        float(confidence),
+                                        4,
+                                    ),
+                                    "traffic_light_state": signal_state,
+                                    "was_armed": armed,
+                                    "was_reported": reported,
+                                    "anchor_name": (
+                                        violation_config[
+                                            "front_anchors"
+                                        ][direction]
+                                    ),
+                                    "anchor_x": round(
+                                        float(diagnostic_anchor[0]),
+                                        2,
+                                    ),
+                                    "anchor_y": round(
+                                        float(diagnostic_anchor[1]),
+                                        2,
+                                    ),
+                                    "bbox_x1": round(float(x1), 2),
+                                    "bbox_y1": round(float(y1), 2),
+                                    "bbox_x2": round(float(x2), 2),
+                                    "bbox_y2": round(float(y2), 2),
+                                    "manual_vehicle_id": "",
+                                    "object_is_car": "",
+                                    "entered_rv_after_red": "",
+                                    "is_violation": "",
+                                    "review_status": "pending",
+                                    "notes": (
+                                        "Pipeline reported event after "
+                                        "entry was already observed"
+                                    ),
+                                }
+                            )
+
+                        previous_inside_by_track[track_key] = inside_region
+                        was_reported_by_track[track_key] = reported
 
                         draw_track(
                             annotated,
                             bbox_xyxy,
-                            int(track_id),
+                            track_id,
                             float(confidence),
                             direction,
                             anchor,
@@ -599,13 +779,14 @@ def main() -> None:
                     frame_index,
                     fps,
                     traffic_light_estimate.raw_state,
-                    traffic_light_estimate.smoothed_state,
+                    signal_state,
                     traffic_light_estimate.red_pixels,
                     traffic_light_estimate.yellow_pixels,
                     traffic_light_estimate.green_pixels,
                     near_tracks,
                     far_tracks,
                     len(violation_manager.events),
+                    len(passage_candidates),
                 )
 
                 latest_frame = annotated
@@ -626,18 +807,40 @@ def main() -> None:
         capture.release()
         cv2.destroyAllWindows()
 
-    report_path = (
+    reports_dir = (
         PROJECT_ROOT
         / config["project"]["output_root"]
         / "reports"
+    )
+
+    report_path = (
+        reports_dir
         / f"{video_path.stem}_two_direction_violations.csv"
+    )
+
+    passage_review_path = (
+        reports_dir
+        / f"{video_path.stem}_two_direction_passages_review.csv"
     )
 
     write_events_csv(report_path, violation_manager.events)
 
+    write_passage_review_csv(
+        passage_review_path,
+        passage_candidates,
+    )
+
     print(f"Frames processed: {processed}")
+    print(
+        f"Passage candidates recorded: "
+        f"{len(passage_candidates)}"
+    )
     print(f"Violations recorded: {len(violation_manager.events)}")
     print(f"CSV report: {report_path.resolve()}")
+    print(
+        "Passage review CSV: "
+        f"{passage_review_path.resolve()}"
+    )
 
     if violation_manager.events:
         print("\nRecorded events:")

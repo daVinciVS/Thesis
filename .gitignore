@@ -1,4 +1,6 @@
+# ------------------------------------------------------------
 # Python
+# ------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *.pyo
@@ -7,29 +9,56 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 
-# Virtual environment
+
+# ------------------------------------------------------------
+# Python virtual environments
+# ------------------------------------------------------------
 .venv/
 venv/
+env/
 
-# VS Code
+
+# ------------------------------------------------------------
+# Editor and notebook files
+# ------------------------------------------------------------
 .vscode/
-
-# Jupyter
 .ipynb_checkpoints/
 
-# Large raw data and generated artifacts
-data/raw/*.mp4
-data/clips/*.mp4
+
+# ------------------------------------------------------------
+# Large local video data
+# Keep metadata and annotations under data/ tracked by Git.
+# ------------------------------------------------------------
+data/raw/
+data/clips/
+
+
+# ------------------------------------------------------------
+# Generated outputs and evidence
+# ------------------------------------------------------------
 outputs/
+
+
+# ------------------------------------------------------------
+# Downloaded and trained model weights
+# ------------------------------------------------------------
 models/pretrained/*.pt
 models/custom/*.pt
 models/custom/*.onnx
 
+
+# ------------------------------------------------------------
+# Temporary local files
+# ------------------------------------------------------------
+*.tmp
+*.temp
+*.bak
+*.log
+
+
+# ------------------------------------------------------------
 # Operating system files
+# ------------------------------------------------------------
 .DS_Store
 Thumbs.db
 desktop.ini
-
-# Temporary calibration and local experimental artifacts
-outputs/reports/*.json
-outputs/reports/*.csv

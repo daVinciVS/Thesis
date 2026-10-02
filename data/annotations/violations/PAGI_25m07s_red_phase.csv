@@ -1,6 +1,18 @@
-event_id,direction,raw_frame_index,clip_frame_index,timestamp_seconds,manual_vehicle_id,pipeline_track_id,is_violation,verification_status,notes
-1,far_side,44502,252,1513.56,TBD,7,TBD,pending,Verify whether vehicle crossed into R_violation during red
-2,near_side,44648,398,1518.52,TBD,9,TBD,pending,Verify whether vehicle crossed into R_violation during red
-3,near_side,44672,422,1519.34,TBD,13,TBD,pending,Verify whether vehicle crossed into R_violation during red
-4,near_side,44718,468,1520.90,TBD,12,TBD,pending,Verify whether vehicle crossed into R_violation during red
-5,near_side,44783,533,1523.11,TBD,19,TBD,pending,Verify whether vehicle crossed into R_violation during red
+event_id,video_name,manual_vehicle_id,direction,raw_frame_index,clip_frame_index,timestamp_seconds,ground_truth_light_state,is_violation,pipeline_flagged,pipeline_track_id,review_candidate_ids,notes
+1,PAGI.mp4,C01,far_side,44256,6,1505.190,yellow,false,false,2,1,Car entered R_violation during yellow; non-violation
+2,PAGI.mp4,C02,far_side,44502,252,1513.557,red,true,true,7,2,Confirmed red-light violation
+3,PAGI.mp4,C03,near_side,44648,398,1518.522,red,true,true,9,3,Confirmed red-light violation
+4,PAGI.mp4,C04,near_side,44671,421,1519.305,red,true,true,13,4|5,Confirmed red-light violation; system briefly estimated green then reported at frame 44672
+5,PAGI.mp4,C05,near_side,44715,465,1520.801,red,true,true,12,6|7,Confirmed red-light violation; system briefly estimated green then reported at frame 44718
+6,PAGI.mp4,C06,near_side,44783,533,1523.114,red,true,true,19,8,Confirmed red-light violation
+7,PAGI.mp4,C07,far_side,44951,701,1528.828,green,false,false,25,9,Car entered R_violation during green; non-violation
+8,PAGI.mp4,C08,near_side,44992,742,1530.222,green,false,false,24,10,Car entered R_violation during green; non-violation
+9,PAGI.mp4,C09,far_side,45020,770,1531.174,green,false,false,26,11,Car entered R_violation during green; non-violation
+10,PAGI.mp4,C10,near_side,45064,814,1532.671,green,false,false,27,12,Car entered R_violation during green; non-violation
+11,PAGI.mp4,C11,far_side,45103,853,1533.997,green,false,false,28|39,13|16,Same physical car produced two candidates during green; counted once as one non-violation
+12,PAGI.mp4,C12,near_side,45110,860,1534.235,green,false,false,30,14,Car entered R_violation during green; non-violation
+13,PAGI.mp4,C13,near_side,45139,889,1535.222,green,false,false,31,15,Car entered R_violation during green; non-violation
+14,PAGI.mp4,C14,far_side,45169,919,1536.242,yellow,false,false,32,17,Car entered R_violation during yellow; non-violation
+15,PAGI.mp4,C15,near_side,45192,942,1537.024,green,false,false,34,18,Car entered R_violation during green; non-violation
+16,PAGI.mp4,C16,near_side,45206,956,1537.501,green,false,false,37,19,Car entered R_violation during green; non-violation
+17,PAGI.mp4,C17,near_side,45236,986,1538.521,yellow,false,false,40,20,Car entered R_violation during yellow; non-violation
