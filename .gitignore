@@ -29,3 +29,7 @@ models/custom/*.onnx
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Temporary calibration and local experimental artifacts
+outputs/reports/*.json
+outputs/reports/*.csv
