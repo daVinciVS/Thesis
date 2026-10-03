@@ -1,0 +1,167 @@
+project:
+  name: rlvd_yolov8_bytetrack
+  output_root: outputs
+
+input:
+  expected_width: 1920
+  expected_height: 1080
+  default_fps: 30.0
+
+model:
+  # Initial COCO-pretrained YOLOv8 detector.
+  # Replace with models/custom/best.pt after local fine-tuning.
+  weights: models/pretrained/yolov8n.pt
+
+  # CPU baseline.
+  device: cpu
+
+  # Current tested baseline.
+  # 0.40 reduced motorcycle-as-car false positives in visual testing.
+  confidence: 0.40
+  iou: 0.45
+  imgsz: 640
+
+  # COCO class ID 2 corresponds to "car".
+  car_class_id: 2
+
+  # Custom Ultralytics ByteTrack configuration.
+  tracker_config: configs/bytetrack.yaml
+
+roi:
+  # Two monitored vehicle approaches in the same camera view.
+  vehicle_regions:
+    near_side:
+      # Cars come from the lower-right / foreground and travel into
+      # the shared central road area.
+      direction: up_left
+      polygon:
+        - [374, 719]
+        - [1220, 667]
+        - [1918, 839]
+        - [1918, 1079]
+        - [574, 1077]
+
+    far_side:
+      # Cars come from the upper-left / background and travel downward
+      # toward the shared central road area and camera.
+      direction: down_right
+      polygon:
+        - [313, 601]
+        - [816, 572]
+        - [295, 443]
+        - [248, 448]
+
+  # The two visible signal heads are mirrored/synchronized:
+  # near-side and far-side directions show the same state.
+  #
+  # HSV mask activation counts from both rectangles are aggregated
+  # into one common state: red, yellow, green, or unknown.
+  traffic_light_rois:
+    common:
+      - [136, 290, 172, 395]
+      - [473, 123, 569, 159]
+
+  # Thin direction-specific stop-line bands.
+  stop_lines:
+    near_side:
+      direction: up_left
+      polygon:
+        - [409, 732]
+        - [1266, 675]
+        - [1274, 695]
+        - [417, 752]
+
+    far_side:
+      direction: down_right
+      polygon:
+        - [328, 591]
+        - [823, 570]
+        - [831, 590]
+        - [336, 611]
+
+  # Central road/intersection corridor between the two stop lines.
+  # A car must enter this polygon after reaching its own stop-line band
+  # to confirm that it continued through the stop line.
+  violation_region:
+    polygon:
+      - [309, 591]
+      - [811, 571]
+      - [1248, 674]
+      - [388, 741]
+
+traffic_light:
+  # Thesis default temporal smoothing window, W = 5 frames.
+  smoothing_window: 5
+
+  # Morphological opening and closing for HSV masks.
+  morphology_kernel_size: 3
+
+  # Minimum active HSV pixels before accepting a raw color state.
+  min_active_pixels: 15
+
+  # HSV thresholds from Table 3.8.
+  # OpenCV hue range: 0-179.
+  hsv_thresholds:
+    red_lower_1: [0, 100, 70]
+    red_upper_1: [10, 255, 255]
+
+    red_lower_2: [160, 100, 70]
+    red_upper_2: [180, 255, 255]
+
+    yellow_lower: [15, 100, 70]
+    yellow_upper: [35, 255, 255]
+
+    green_lower: [40, 60, 50]
+    green_upper: [90, 255, 255]
+
+violation:
+  # Initial box-to-stop-band overlap threshold from the thesis.
+  # The revised pipeline will additionally use the directional front anchor.
+  min_stop_iou: 0.05
+
+  # Small per-frame direction check. This prevents static/jittering
+  # detections from becoming crossing events.
+  min_directional_displacement_px: 3
+
+  # Maximum time permitted from stop-band contact to central
+  # violation-region entry: 45 frames ≈ 1.5 seconds at 30 FPS.
+  crossing_window_frames: 45
+
+  # Allow a short detection/anchor gap between last observed outside and
+  # first observed inside R_violation. At ~30 FPS, 8 frames ≈ 0.27 seconds.
+  entry_tolerance_frames: 8
+
+  # Do not end a red phase after one flickering non-red frame.
+  # At ~30 FPS, 15 frames is about 0.5 seconds.
+  red_phase_end_hold_frames: 15
+
+  # Direction-specific vehicle-front anchors.
+  #
+  # Near-side cars move from lower-right toward upper-left, so the
+  # top-left point approximates the front closest to the intersection.
+  #
+  # Far-side cars move from upper-left toward lower-right, so the
+  # bottom-right point is the initial front approximation.
+  #
+  # We can change far_side to bottom_center or bottom_left after visual
+  # validation if that point reaches R_stop_far first.
+  front_anchors:
+  # Near-side cars approach from the lower-right; in this camera perspective,
+  # the bottom-left bbox corner reaches the near stop-line / violation region first.
+    near_side: bottom_left
+
+  # Initial far-side front proxy; keep validating visually.
+    far_side: bottom_right
+
+  # Save full-frame and cropped vehicle evidence for each recorded event.
+  save_evidence: true
+  evidence_padding: 20
+
+  # Clear temporary event state after roughly 3 seconds of missing track data.
+  reset_track_state_after_missing_frames: 90
+
+output:
+  write_annotated_video: true
+  write_frame_log: true
+  write_track_log: true
+  codec: mp4v
