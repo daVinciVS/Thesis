@@ -1,0 +1,7 @@
+clip_start_frame,clip_end_frame,raw_start_frame,raw_end_frame,ground_truth_state,is_ambiguous,notes
+0,47,68380,68427,yellow,false,Yellow phase at beginning of selected clip
+48,138,68428,68518,green,false,Green lamp visibly active
+139,200,68519,68580,yellow,false,Yellow lamp visibly active
+201,751,68581,69131,red,false,Red lamp visibly active; contains C06 C07 and C08 violation events
+752,841,69132,69221,green,false,Green lamp visibly active
+842,1199,69222,69579,yellow,false,Yellow lamp visibly active until end of clip
