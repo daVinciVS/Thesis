@@ -1,0 +1,7 @@
+clip_start_frame,clip_end_frame,raw_start_frame,raw_end_frame,ground_truth_state,is_ambiguous,notes
+0,588,14845,15433,yellow,false,Yellow lamp visibly active at beginning of selected clip
+589,675,15434,15520,green,false,Green lamp visibly active
+676,735,15521,15580,yellow,false,Yellow lamp visibly active
+736,1290,15581,16135,red,false,Red lamp visibly active; contains C07 C08 and C09 red-light violations; pipeline classified passage candidates as green
+1291,1381,16136,16226,green,false,Green lamp visibly active
+1382,1799,16227,16644,yellow,false,Yellow lamp visibly active until end of selected clip

@@ -1,0 +1,12 @@
+event_id,video_name,manual_vehicle_id,direction,raw_frame_index,clip_frame_index,timestamp_seconds,ground_truth_light_state,is_violation,pipeline_flagged,pipeline_track_id,review_candidate_ids,notes
+1,SIANG.mp4,C01,far_side,4374,26,145.851,yellow,false,false,4,1,Car entered R_violation during yellow; non-violation
+2,SIANG.mp4,C02,far_side,4392,44,146.451,yellow,false,false,3,2,Car entered R_violation during yellow; non-violation
+3,SIANG.mp4,C03,near_side,4419,71,147.351,yellow,false,false,1,3,Car entered R_violation during yellow; non-violation
+4,SIANG.mp4,C04,near_side,4490,142,149.719,yellow,false,false,6,4,Car entered R_violation during yellow; non-violation
+5,SIANG.mp4,C05,far_side,4529,181,151.019,yellow,false,false,8,5,Car entered R_violation during yellow; non-violation
+6,SIANG.mp4,C06,near_side,4547,199,151.619,yellow,false,false,10,6,Car entered R_violation during yellow; non-violation
+7,SIANG.mp4,C07,far_side,4597,249,153.287,yellow,false,false,13,7,Car entered R_violation during yellow; non-violation
+8,SIANG.mp4,C08,far_side,4661,313,155.421,yellow,false,false,17,8,Car entered R_violation during yellow; non-violation
+9,SIANG.mp4,C09,near_side,4711,363,157.088,yellow,false,false,19,9,Car entered R_violation during yellow; non-violation
+10,SIANG.mp4,C10,far_side,5041,693,168.092,yellow,false,false,23,10,Car entered R_violation during yellow; non-violation
+11,SIANG.mp4,C11,far_side,5085,737,169.559,yellow,false,false,24,11,Car entered R_violation during yellow; non-violation

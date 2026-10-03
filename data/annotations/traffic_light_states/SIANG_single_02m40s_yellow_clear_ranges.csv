@@ -1,0 +1,2 @@
+clip_start_frame,clip_end_frame,raw_start_frame,raw_end_frame,ground_truth_state,is_ambiguous,notes
+0,899,4348,5247,yellow,false,Yellow lamp visibly active throughout the selected clip; all 11 reviewed car entries occurred during yellow; pipeline classified candidates as green

@@ -1,0 +1,20 @@
+event_id,video_name,manual_vehicle_id,direction,raw_frame_index,clip_frame_index,timestamp_seconds,ground_truth_light_state,is_violation,pipeline_flagged,pipeline_track_id,review_candidate_ids,notes
+1,SIANG.mp4,C01,far_side,14979,134,499.473,yellow,false,false,2,1,Car entered R_violation during yellow; non-violation
+2,SIANG.mp4,C02,far_side,15207,362,507.076,yellow,false,false,5,2,Car entered R_violation during yellow; non-violation
+3,SIANG.mp4,C03,far_side,15326,481,511.044,yellow,false,false,8,3,Car entered R_violation during yellow; non-violation
+4,SIANG.mp4,C04,far_side,15372,527,512.578,yellow,false,false,10,4,Car entered R_violation during yellow; non-violation
+5,SIANG.mp4,C05,far_side,15527,682,517.746,yellow,false,false,11,5,Car entered R_violation during yellow; non-violation
+6,SIANG.mp4,C06,near_side,15563,718,518.947,yellow,false,false,13,6,Entered during yellow and was already inside R_violation when red began; non-violation
+7,SIANG.mp4,C07,near_side,15616,771,520.714,red,true,false,15,7,Confirmed red-light violation; pipeline classified light as green so no event was armed or reported
+8,SIANG.mp4,C08,near_side,15710,865,523.848,red,true,false,19,8,Confirmed red-light violation; pipeline classified light as green so no event was armed or reported
+9,SIANG.mp4,C09,far_side,15931,1086,531.218,red,true,false,21,9,Confirmed red-light violation; pipeline classified light as green so no event was armed or reported
+10,SIANG.mp4,C10,far_side,16202,1357,540.254,green,false,false,39,10,Car entered R_violation during green; non-violation
+11,SIANG.mp4,C11,far_side,16266,1421,542.388,yellow,false,false,46,11,Car entered R_violation during yellow; non-violation
+12,SIANG.mp4,C12,far_side,16319,1474,544.155,yellow,false,false,44,12|13|14,Car entry during yellow; duplicated candidate records and occlusion-caused pipeline track switch 44 to 55
+13,SIANG.mp4,C13,far_side,16378,1533,546.123,yellow,false,false,45,15,Car entered R_violation during yellow; non-violation
+14,SIANG.mp4,C14,far_side,16406,1561,547.056,yellow,false,false,57,16,Car entered R_violation during yellow; non-violation; overlapping-car tracking issue observed
+15,SIANG.mp4,C15,near_side,16443,1598,548.290,yellow,false,false,28,17,Car entered R_violation during yellow; non-violation
+16,SIANG.mp4,C16,near_side,16498,1653,550.124,yellow,false,false,54,18|22|23,Same manual car later reassigned from pipeline track 54 to 73 after ID switch; non-violation
+17,SIANG.mp4,C17,far_side,16541,1696,551.558,yellow,false,false,69,19,Car entered R_violation during yellow; non-violation
+18,SIANG.mp4,C18,near_side,16568,1723,552.458,yellow,false,false,62,20,Car entered R_violation during yellow; non-violation
+19,SIANG.mp4,C19,near_side,16592,1747,553.259,yellow,false,false,54,21,Different physical car assigned reused pipeline track 54; entered during yellow; non-violation

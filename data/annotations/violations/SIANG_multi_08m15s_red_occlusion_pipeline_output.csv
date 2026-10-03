@@ -1,0 +1,1 @@
+video_name,direction,frame_index,timestamp_seconds,red_phase_id,track_id,anchor_name,anchor_x,anchor_y,bbox_x1,bbox_y1,bbox_x2,bbox_y2,traffic_light_state,evidence_frame_path,evidence_crop_path
