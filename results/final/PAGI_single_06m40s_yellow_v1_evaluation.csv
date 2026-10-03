@@ -1,0 +1,1 @@
+result,ground_truth_event_id,ground_truth_vehicle_id,ground_truth_frame,ground_truth_direction,prediction_frame,prediction_direction,frame_difference,prediction_track_id

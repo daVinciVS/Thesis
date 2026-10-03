@@ -362,8 +362,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--frames",
         type=int,
-        default=300,
-        help="Number of frames to process.",
+        default=None,
+        help="Maximum number of frames to process; omit to process the full video.",
     )
 
     return parser.parse_args()
@@ -488,7 +488,7 @@ def main() -> None:
     print("SPACE = pause/resume | Q or ESC = quit")
 
     try:
-        while processed < args.frames:
+        while args.frames is None or processed < args.frames:
             if not paused:
                 success, frame = capture.read()
 

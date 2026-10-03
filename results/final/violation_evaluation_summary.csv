@@ -1,0 +1,5 @@
+﻿dataset,run_name,config,frames_processed,passage_candidates,annotation_rows,ground_truth_violation_events,predicted_events,true_positives,false_positives,false_negatives,precision,recall,f1,notes
+SIANG_multi_08m15s_red_occlusion,SIANG_multi_red_final_v4,pipeline_tight_traffic_light_rois_v4.yaml,1800,23,19,3,3,3,0,0,1.0000,1.0000,1.0000,"C07, C08, and C09 matched exactly at frames 15616, 15710, and 15931. The former frame-16568 false positive was removed."
+SIANG_single_02m40s_yellow_clear,SIANG_yellow_final_v4,pipeline_tight_traffic_light_rois_v4.yaml,900,11,11,0,0,0,0,0,N/A,N/A,N/A,"Negative control: 11 annotated legal yellow-phase passages, no violation events emitted."
+PAGI_25m07s_red_phase,PAGI_25m07s_red_phase_v1,pipeline_pagi_v1.yaml,1000,20,17,5,5,5,0,0,1.0000,1.0000,1.0000,"Five annotated red-light violations detected: C02–C06. Event timing errors were 0–4 frames."
+PAGI_single_06m40s_yellow,PAGI_single_06m40s_yellow_v1,pipeline_pagi_v1.yaml,600,1,1,0,0,0,0,0,N/A,N/A,N/A,"Negative control: one legal passage during flashing yellow; no violation event emitted."

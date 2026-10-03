@@ -1,0 +1,4 @@
+result,ground_truth_event_id,ground_truth_vehicle_id,ground_truth_frame,ground_truth_direction,prediction_frame,prediction_direction,frame_difference,prediction_track_id
+TP,7,C07,15616,near_side,15616,near_side,0,15
+TP,8,C08,15710,near_side,15710,near_side,0,19
+TP,9,C09,15931,far_side,15931,far_side,0,21
